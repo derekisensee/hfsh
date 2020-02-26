@@ -4,26 +4,46 @@
 #include <string.h>
 #include <unistd.h>
 
+// should single external commands run in their own thread?
+// what should format of bin be? '/bin:/etcetc' ?
+// 
+
 char *path;
 
+// first argument is command, second is the arguments for the command
 void *extcmd(char *cmd, char *ext) {
+  // first, have to put ext into an array of strings
+  char **args = NULL;
+  int spaces = 0;
+  ext = strtok(ext, " ");
+  //printf("%s", ext);
+  while (ext) {
+    args = realloc(args, sizeof (char*) * ++spaces);
+
+    args[spaces - 1] = ext;
+    // and move on to the next token
+    ext = strtok(NULL, " ");
+    //printf("%s", ext);
+  }
+  //printf("%s", args[1]);
   // since strtok overwrites old string, have to make copy
   char *tempEnv;
   tempEnv = malloc(strlen(path)+1); 
   strcpy(tempEnv, path);
-  strtok(tempEnv, ";");
+  strtok(tempEnv, ":");
   // have to figure out how exactly to split path paths
-  char *splitInput = strtok(tempEnv, ";"); // strtok modifies 'buffer' ?
+  /*char *splitArgs = strtok(tempEnv, ":"); // strtok modifies 'buffer' ?
 
   while (splitInput != NULL) {
     // if command does not execute
-    if (execv(strcat(splitInput, cmd), ext) == -1) {
-      splitInput = strtok(NULL, ";");
+    if (execv(strcat(splitInput, cmd), args) == -1) {
+      splitInput = strtok(NULL, ":");
     }
-  }
+  }*/
   
 
   free(tempEnv);
+  return 0;
 }
 
 void errorPrint() {
@@ -46,14 +66,15 @@ void interactiveMode() {
 
       printf("hfsh> ");
       getline(&buffer, &buffSize, stdin);
-      char *splitInput = strtok(buffer, " \t\n"); // strtok modifies 'buffer' ?
+      // need newline to be delimiter b/c if user just hits 'exit' and then an enter immediately after, 
+      //strtok won't split up the result correctly
+      char *splitInput = strtok(buffer, " \t\n"); 
 
       // built-in commands
       if (strcmp(splitInput, "exit") == 0) {
         exit(0);
       }
-
-      if (strcmp(splitInput, "cd") == 0) {
+      else if (strcmp(splitInput, "cd") == 0) {
         int argCount = 0;
         
         while (splitInput) {
@@ -62,23 +83,24 @@ void interactiveMode() {
             break;
           }
           chdir(splitInput);
+          splitInput = strtok(NULL, " ");
         }
       }
-
-      if (strcmp(splitInput, "path")) {
-
+      else if (strcmp(splitInput, "path") == 0) {
+        printf("path cmd");
       }
-
       else {
-        extcmd(splitInput, strtok(NULL, ""));
+        char *cmd = malloc(strlen(splitInput));
+        strcpy(cmd, splitInput);
+        splitInput = strtok(NULL, "");
+        printf("%s | %s", cmd, splitInput);
+        extcmd(cmd, splitInput);
       }
-
-      // -----------------
     }
 }
 
 int main(int argc, char *args[]) {
-  path = "/bin";
+  path = "/bin"; // our initial path
   // normal mode
   if (argc == 1) {
     interactiveMode();
