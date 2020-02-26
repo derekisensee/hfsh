@@ -4,9 +4,9 @@
 #include <string.h>
 #include <unistd.h>
 
-// should single external commands run in their own thread?
-// what should format of bin be? '/bin:/etcetc' ?
-// 
+// should single external commands run in their own thread? 
+ // don't wait if given & - for last cmd without a & after it, do execv and make hfsh wait. so last cmd is in "foreground"
+ // 
 
 char *path;
 
@@ -16,33 +16,40 @@ void *extcmd(char *cmd, char *ext) {
   char **args = NULL;
   int spaces = 0;
   ext = strtok(ext, " ");
+  args = realloc(args, sizeof (char*) * ++spaces);
+  args[0] = cmd;
   //printf("%s", ext);
   while (ext) {
     args = realloc(args, sizeof (char*) * ++spaces);
 
     args[spaces - 1] = ext;
     // and move on to the next token
-    ext = strtok(NULL, " ");
-    //printf("%s", ext);
+    ext = strtok(NULL, " \n\r"); // ??? need to delimit by newline/carriage return
   }
   //printf("%s", args[1]);
   // since strtok overwrites old string, have to make copy
   char *tempEnv;
   tempEnv = malloc(strlen(path)+1); 
   strcpy(tempEnv, path);
-  strtok(tempEnv, ":");
+  //strtok(tempEnv, ":");
   // have to figure out how exactly to split path paths
-  /*char *splitArgs = strtok(tempEnv, ":"); // strtok modifies 'buffer' ?
-
-  while (splitInput != NULL) {
-    // if command does not execute
-    if (execv(strcat(splitInput, cmd), args) == -1) {
-      splitInput = strtok(NULL, ":");
+  char *splitPaths = strtok(tempEnv, ":"); // strtok modifies 'buffer' ?
+  //printf("%s\n", strcat(splitPaths, strcat("/", cmd)));
+  char slash[2] = {'/', '\0'};
+  //printf("%s\n", strcat(splitPaths, strcat(slash, cmd)));
+  //execv(strcat(splitPaths, strcat(slash, cmd)), args);
+  char *currPath = strcat(splitPaths, strcat(slash, cmd));
+  while (splitPaths) {
+    // use access() to find program
+    //char *currPath = strcat(splitPaths, strcat(slash, cmd));
+    //printf("%s" ,currPath);
+    if (access(currPath) == 0) {
+      printf("%s", currPath);
+      break;
     }
-  }*/
-  
-
-  free(tempEnv);
+    splitPaths = strtok(NULL, " ");
+  }
+  //free(tempEnv);
   return 0;
 }
 
@@ -82,25 +89,25 @@ void interactiveMode() {
             errorPrint();
             break;
           }
-          chdir(splitInput);
+          chdir(splitInput); // check if chdir returns error
           splitInput = strtok(NULL, " ");
         }
       }
       else if (strcmp(splitInput, "path") == 0) {
-        printf("path cmd");
+        //printf("path cmd");
       }
       else {
         char *cmd = malloc(strlen(splitInput));
         strcpy(cmd, splitInput);
         splitInput = strtok(NULL, "");
-        printf("%s | %s", cmd, splitInput);
+        //printf("%s | %s", cmd, splitInput);
         extcmd(cmd, splitInput);
       }
     }
 }
 
 int main(int argc, char *args[]) {
-  path = "/bin"; // our initial path
+  path = "/bin:"; // our initial path
   // normal mode
   if (argc == 1) {
     interactiveMode();
