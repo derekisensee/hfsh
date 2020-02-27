@@ -5,6 +5,6 @@ if ! [[ -x hfsh ]]; then
     exit 1
 fi
 
-run-tests.sh $*
+./run-tests.sh $*
 
 

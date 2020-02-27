@@ -3,12 +3,18 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 // should single external commands run in their own thread? 
  // don't wait if given & - for last cmd without a & after it, do execv and make hfsh wait. so last cmd is in "foreground"
 
 // need to make path a char[] ??
-char *path;
+char path[9068]="/bin:";
+
+void errorPrint() {
+  char error_message[30] = "An error has occurred\n";
+  write(STDERR_FILENO, error_message, strlen(error_message)); 
+}
 
 // first argument is command, second is the arguments for the command
 void *extcmd(char *cmd, char *ext, int waiting) {
@@ -36,7 +42,7 @@ void *extcmd(char *cmd, char *ext, int waiting) {
   //printf("copy: %s\n", slash);
 
   //printf("%s %s %s", args[0], args[1], args[2]);
-
+  int found = 0;
   while (splitPaths != NULL) {
     // use access() to find program
     //char *currPath = malloc(strlen(strcat(splitPaths, slash)));
@@ -48,6 +54,7 @@ void *extcmd(char *cmd, char *ext, int waiting) {
     
     //printf("copy: %s\n", spCopy);
     if (access(spCopy, F_OK) == 0) {
+      found = 1;
       //printf("%s", spCopy);
       int status;
       //pid_t w;
@@ -63,53 +70,72 @@ void *extcmd(char *cmd, char *ext, int waiting) {
       splitPaths = strtok(NULL, " ");
     }
   }
+  if (found == 0) {
+    errorPrint();
+  }
   return 0;
 }
 
-void errorPrint() {
-  char error_message[30] = "An error has occurred\n";
-  write(STDERR_FILENO, error_message, strlen(error_message)); 
-}
-
-void handleInput(char *buffer) {
-  // need newline to be delimiter b/c if user just hits 'exit' and then an enter immediately after, 
-  //strtok won't split up the result correctly
-  char *splitInput = strtok(buffer, " \t\n"); 
-
-  // built-in commands
+void cmdChunk(char *splitInput) {
+  //char *splitInput = strtok();
   if (strcmp(splitInput, "exit") == 0) {
-    exit(0);
+    splitInput = strtok(NULL, " ");
+    if (splitInput != NULL) {
+      errorPrint();
+    }
+    else
+      exit(0);
   }
   else if (strcmp(splitInput, "cd") == 0) {
-    int argCount = 0;
-    char dir[] = "";
-    splitInput = strtok(NULL, " \n");
+    //int argCount = 0;
+    char dir[4096] = "";
+    splitInput = strtok(NULL, " \n\r");
+    // make sure we get at least 1 arg
+    //printf("%s", splitInput);
     if (splitInput != NULL) {
       strcpy(dir, splitInput);
     } 
     else {
         //errorPrint();
-        argCount = 99; // make error happen
+        //printf("null!");
+        //argCount = 99; // make error happen
+        // TODO: need to make error trip later
     }
-
-    while (splitInput) {
-      if (argCount++ > 1) {
-        errorPrint();
-        break;
-      }
-      splitInput = strtok(NULL, " ");
-    }
-    if (argCount == 1) {
+    //printf("%s", splitInput);
+    // checks if we have more than arg
+    //printf("%s", dir);
+    splitInput = strtok(NULL, " ");
+    if (splitInput == NULL) {
       if (chdir(dir) == -1) {
         errorPrint();
+
+        /*switch (errno)
+        {
+        case ENOENT:
+          printf( "Unable to locate the directory: %s\n", dir );
+          break;
+        case EINVAL:
+          printf( "Invalid buffer.\n");
+          break;
+        default:
+          printf( "Unknown error.\n");
+        }*/
       }
-    } else
+    } 
+    else {
+      //printf("Frick");
       errorPrint();
+    }
   }
   else if (strcmp(splitInput, "path") == 0) {
-    //printf("path cmd");
+    strcpy(path, "");
+    while ((splitInput = strtok(NULL, " \n")) != NULL) {
+      strcat(path, splitInput);
+      strcat(path, ":");
+    }
+    //printf("%s", path);
   }
-  else if (strcmp(buffer, "\r") == 0) {
+  else if (strcmp(splitInput, "\r") == 0) {
     // do nothing ??????????????
   }
   else {
@@ -120,6 +146,29 @@ void handleInput(char *buffer) {
     // have to: check for &, >, respond appropriately
     extcmd(cmd, splitInput, 1);
   }
+}
+
+void handleInput(char *buffer) {
+  // need newline to be delimiter b/c if user just hits 'exit' and then an enter immediately after, 
+  //strtok won't split up the result correctly
+  // -----need to check if redirection or &'s------ 
+  // redirection first
+  char *inputCopy = malloc(strlen(buffer)+1);
+  strcpy(inputCopy, buffer);
+  char *redir = strtok(inputCopy, ">");
+  char *firstChunk = malloc(strlen(redir)+1);;
+  strcpy(firstChunk, redir);
+  // if we have a file to redirect to
+  if ((redir = strtok(NULL, " ")) != NULL) {
+    freopen(redir, "w", stdout);
+  }
+  char *splitInput = strtok(firstChunk, " \t\n"); 
+  cmdChunk(splitInput);
+  // ------------
+  //char *splitInput = strtok(buffer, " \t\n"); 
+  //cmdChunk(splitInput);
+  // built-in commands
+  
 }
 
 void interactiveMode() {
@@ -143,15 +192,15 @@ void batchMode(FILE *fp) {
   size_t buffSize = 32;
   //size_t input;
   buffer = (char *)malloc(buffSize * sizeof(char));
-  getline(&buffer, &buffSize, fp);
-  while (buffer != NULL ) {
+  
+  while (getline(&buffer, &buffSize, fp) != -1) {
     handleInput(buffer);
-    getline(&buffer, &buffSize, fp);
+    //getline(&buffer, &buffSize, fp);
   }
 }
 
 int main(int argc, char *args[]) {
-  path = "/bin:"; // our initial path
+  //path = "/bin:"; // our initial path
   // normal mode
   if (argc == 1) {
     interactiveMode();
