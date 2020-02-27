@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 // should single external commands run in their own thread? 
  // don't wait if given & - for last cmd without a & after it, do execv and make hfsh wait. so last cmd is in "foreground"
@@ -10,11 +11,11 @@
 char *path;
 
 // first argument is command, second is the arguments for the command
-void *extcmd(char *cmd, char *ext) {
+void *extcmd(char *cmd, char *ext, int waiting) {
   // first, have to put ext into an array of strings
   char **args = NULL;
   int spaces = 0;
-  ext = strtok(ext, " ");
+  ext = strtok(ext, " \n");
   args = realloc(args, sizeof (char*) * ++spaces);
   args[0] = cmd;
   //printf("%s", ext);
@@ -23,7 +24,7 @@ void *extcmd(char *cmd, char *ext) {
 
     args[spaces - 1] = ext;
     // and move on to the next token
-    ext = strtok(NULL, " \n\r"); // ??? need to delimit by newline/carriage return
+    ext = strtok(NULL, " "); // ??? need to delimit by newline/carriage return
   }
   // since strtok overwrites old string, have to make copy
   char *tempEnv;
@@ -36,12 +37,12 @@ void *extcmd(char *cmd, char *ext) {
   //char spCopy[] = ""; 
   //printf("copy: %s\n", slash);
 
-  printf("%s %s %s", args[0], args[1], args[2]);
+  //printf("%s %s %s", args[0], args[1], args[2]);
 
   while (splitPaths != NULL) {
     // use access() to find program
     //char *currPath = malloc(strlen(strcat(splitPaths, slash)));
-    char spCopy[1024];
+    char spCopy[1024] = "";
     strcat(spCopy, splitPaths);
     //printf("1212: %s\n", slash);
     strcat(spCopy, slash);
@@ -49,8 +50,14 @@ void *extcmd(char *cmd, char *ext) {
     
     //printf("copy: %s\n", spCopy);
     if (access(spCopy, F_OK) == 0) {
+      //printf("%s", spCopy);
+      int status;
+      //pid_t w;
       if (fork() == 0) {
         execv(spCopy, args);
+      } 
+      else {
+        wait(&status);
       }
       break;
     }
@@ -58,10 +65,6 @@ void *extcmd(char *cmd, char *ext) {
       splitPaths = strtok(NULL, " ");
     }
   }
-  /*else if (access(currPath, F_OK) == 0) {
-    printf("%s", currPath);
-  }*/
-  //free(tempEnv);
   return 0;
 }
 
@@ -108,7 +111,7 @@ void interactiveMode() {
       else if (strcmp(splitInput, "path") == 0) {
         //printf("path cmd");
       }
-      else if (strcmp(buffer, "\n") == 0) {
+      else if (strcmp(buffer, "\r") == 0) {
         // do nothing ??????????????
       }
       else {
@@ -116,7 +119,8 @@ void interactiveMode() {
         strcpy(cmd, splitInput);
         splitInput = strtok(NULL, "");
         //printf("%s | %s", cmd, splitInput);
-        extcmd(cmd, splitInput);
+        // have to: check for &, >, respond appropriately
+        extcmd(cmd, splitInput, 1);
       }
     }
 }
