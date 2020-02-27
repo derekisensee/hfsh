@@ -71,71 +71,83 @@ void errorPrint() {
   write(STDERR_FILENO, error_message, strlen(error_message)); 
 }
 
+void handleInput(char *buffer) {
+  // need newline to be delimiter b/c if user just hits 'exit' and then an enter immediately after, 
+  //strtok won't split up the result correctly
+  char *splitInput = strtok(buffer, " \t\n"); 
+
+  // built-in commands
+  if (strcmp(splitInput, "exit") == 0) {
+    exit(0);
+  }
+  else if (strcmp(splitInput, "cd") == 0) {
+    int argCount = 0;
+    char dir[] = "";
+    splitInput = strtok(NULL, " \n");
+    if (splitInput != NULL) {
+      strcpy(dir, splitInput);
+    } 
+    else {
+        //errorPrint();
+        argCount = 99; // make error happen
+    }
+
+    while (splitInput) {
+      if (argCount++ > 1) {
+        errorPrint();
+        break;
+      }
+      splitInput = strtok(NULL, " ");
+    }
+    if (argCount == 1) {
+      if (chdir(dir) == -1) {
+        errorPrint();
+      }
+    } else
+      errorPrint();
+  }
+  else if (strcmp(splitInput, "path") == 0) {
+    //printf("path cmd");
+  }
+  else if (strcmp(buffer, "\r") == 0) {
+    // do nothing ??????????????
+  }
+  else {
+    char *cmd = malloc(strlen(splitInput));
+    strcpy(cmd, splitInput);
+    splitInput = strtok(NULL, "");
+    //printf("%s | %s", cmd, splitInput);
+    // have to: check for &, >, respond appropriately
+    extcmd(cmd, splitInput, 1);
+  }
+}
+
 void interactiveMode() {
   int running = 1;
 
-    while (running == 1) {
-      // vars
-      char *buffer;
-      size_t buffSize = 32;
-      //size_t input;
-      buffer = (char *)malloc(buffSize * sizeof(char));
+  while (running == 1) {
+    // vars
+    char *buffer;
+    size_t buffSize = 32;
+    //size_t input;
+    buffer = (char *)malloc(buffSize * sizeof(char));
+    printf("hfsh> ");
+    getline(&buffer, &buffSize, stdin);
+    // check for any buffer errors?
+    handleInput(buffer);
+  }
+}
 
-      // check for any buffer errors?
-      // --------------------
-
-      printf("hfsh> ");
-      getline(&buffer, &buffSize, stdin);
-      // need newline to be delimiter b/c if user just hits 'exit' and then an enter immediately after, 
-      //strtok won't split up the result correctly
-      char *splitInput = strtok(buffer, " \t\n"); 
-
-      // built-in commands
-      if (strcmp(splitInput, "exit") == 0) {
-        exit(0);
-      }
-      else if (strcmp(splitInput, "cd") == 0) {
-        int argCount = 0;
-        char dir[] = "";
-        splitInput = strtok(NULL, " \n");
-        if (splitInput != NULL) {
-          strcpy(dir, splitInput);
-        } 
-        else {
-            //errorPrint();
-            argCount = 99; // make error happen
-        }
-
-        while (splitInput) {
-          if (argCount++ > 1) {
-            errorPrint();
-            break;
-          }
-          splitInput = strtok(NULL, " ");
-        }
-        //printf("%d", argCount);
-        if (argCount == 1) {
-          if (chdir(dir) == -1) {
-            errorPrint();
-          }
-        } else 
-          errorPrint();
-      }
-      else if (strcmp(splitInput, "path") == 0) {
-        //printf("path cmd");
-      }
-      else if (strcmp(buffer, "\r") == 0) {
-        // do nothing ??????????????
-      }
-      else {
-        char *cmd = malloc(strlen(splitInput));
-        strcpy(cmd, splitInput);
-        splitInput = strtok(NULL, "");
-        //printf("%s | %s", cmd, splitInput);
-        // have to: check for &, >, respond appropriately
-        extcmd(cmd, splitInput, 1);
-      }
-    }
+void batchMode(FILE *fp) {
+  char *buffer;
+  size_t buffSize = 32;
+  //size_t input;
+  buffer = (char *)malloc(buffSize * sizeof(char));
+  getline(&buffer, &buffSize, fp);
+  while (buffer != NULL ) {
+    handleInput(buffer);
+    getline(&buffer, &buffSize, fp);
+  }
 }
 
 int main(int argc, char *args[]) {
@@ -146,6 +158,7 @@ int main(int argc, char *args[]) {
   }
   // batch mode
   if (argc == 2) {
-    
+    FILE *fp = fopen(args[1], "r");
+    batchMode(fp);
   }
 }
