@@ -6,8 +6,8 @@
 
 // should single external commands run in their own thread? 
  // don't wait if given & - for last cmd without a & after it, do execv and make hfsh wait. so last cmd is in "foreground"
- // 
 
+// need to make path a char[] ??
 char *path;
 
 // first argument is command, second is the arguments for the command
@@ -98,15 +98,25 @@ void interactiveMode() {
       }
       else if (strcmp(splitInput, "cd") == 0) {
         int argCount = 0;
-        
+        char dir[] = "";
+        splitInput = strtok(NULL, " \n");
+        strcpy(dir, splitInput);
+        //printf("%s", dir);
+
         while (splitInput) {
           if (argCount++ > 1) {
             errorPrint();
             break;
           }
-          chdir(splitInput); // check if chdir returns error
           splitInput = strtok(NULL, " ");
         }
+        //printf("%d", argCount);
+        if (argCount == 1) {
+          if (chdir(dir) == -1) {
+            errorPrint();
+          }
+        } else 
+          errorPrint();
       }
       else if (strcmp(splitInput, "path") == 0) {
         //printf("path cmd");
