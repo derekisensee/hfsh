@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -26,29 +25,42 @@ void *extcmd(char *cmd, char *ext) {
     // and move on to the next token
     ext = strtok(NULL, " \n\r"); // ??? need to delimit by newline/carriage return
   }
-  //printf("%s", args[1]);
   // since strtok overwrites old string, have to make copy
   char *tempEnv;
   tempEnv = malloc(strlen(path)+1); 
   strcpy(tempEnv, path);
-  //strtok(tempEnv, ":");
-  // have to figure out how exactly to split path paths
-  char *splitPaths = strtok(tempEnv, ":"); // strtok modifies 'buffer' ?
-  //printf("%s\n", strcat(splitPaths, strcat("/", cmd)));
-  char slash[2] = {'/', '\0'};
-  //printf("%s\n", strcat(splitPaths, strcat(slash, cmd)));
-  //execv(strcat(splitPaths, strcat(slash, cmd)), args);
-  char *currPath = strcat(splitPaths, strcat(slash, cmd));
-  while (splitPaths) {
+  char *splitPaths = strtok(tempEnv, ":\n"); // strtok modifies 'buffer' ?
+  char slash[1024] = {'/', '\0'};
+  //splitPaths = strtok(NULL, " ");
+  strcat(slash, cmd); // slash now holds "/cmd"
+  //char spCopy[] = ""; 
+  //printf("copy: %s\n", slash);
+
+  printf("%s %s %s", args[0], args[1], args[2]);
+
+  while (splitPaths != NULL) {
     // use access() to find program
-    //char *currPath = strcat(splitPaths, strcat(slash, cmd));
-    //printf("%s" ,currPath);
-    if (access(currPath) == 0) {
-      printf("%s", currPath);
+    //char *currPath = malloc(strlen(strcat(splitPaths, slash)));
+    char spCopy[1024];
+    strcat(spCopy, splitPaths);
+    //printf("1212: %s\n", slash);
+    strcat(spCopy, slash);
+    //char *currPath = strcat(spCopy, slash); // doesn't like this, splitPaths not working?
+    
+    //printf("copy: %s\n", spCopy);
+    if (access(spCopy, F_OK) == 0) {
+      if (fork() == 0) {
+        execv(spCopy, args);
+      }
       break;
     }
-    splitPaths = strtok(NULL, " ");
+    else {
+      splitPaths = strtok(NULL, " ");
+    }
   }
+  /*else if (access(currPath, F_OK) == 0) {
+    printf("%s", currPath);
+  }*/
   //free(tempEnv);
   return 0;
 }
@@ -95,6 +107,9 @@ void interactiveMode() {
       }
       else if (strcmp(splitInput, "path") == 0) {
         //printf("path cmd");
+      }
+      else if (strcmp(buffer, "\n") == 0) {
+        // do nothing ??????????????
       }
       else {
         char *cmd = malloc(strlen(splitInput));
