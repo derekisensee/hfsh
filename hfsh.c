@@ -18,10 +18,8 @@ void *extcmd(char *cmd, char *ext, int waiting) {
   ext = strtok(ext, " \n");
   args = realloc(args, sizeof (char*) * ++spaces);
   args[0] = cmd;
-  //printf("%s", ext);
   while (ext) {
     args = realloc(args, sizeof (char*) * ++spaces);
-
     args[spaces - 1] = ext;
     // and move on to the next token
     ext = strtok(NULL, " "); // ??? need to delimit by newline/carriage return
@@ -42,7 +40,7 @@ void *extcmd(char *cmd, char *ext, int waiting) {
   while (splitPaths != NULL) {
     // use access() to find program
     //char *currPath = malloc(strlen(strcat(splitPaths, slash)));
-    char spCopy[1024] = "";
+    char spCopy[1024] = ""; // seems to reset spCopy between path checks
     strcat(spCopy, splitPaths);
     //printf("1212: %s\n", slash);
     strcat(spCopy, slash);
@@ -56,7 +54,7 @@ void *extcmd(char *cmd, char *ext, int waiting) {
       if (fork() == 0) {
         execv(spCopy, args);
       } 
-      else {
+      else if (waiting == 1) {
         wait(&status);
       }
       break;
@@ -100,8 +98,13 @@ void interactiveMode() {
         int argCount = 0;
         char dir[] = "";
         splitInput = strtok(NULL, " \n");
-        strcpy(dir, splitInput);
-        //printf("%s", dir);
+        if (splitInput != NULL) {
+          strcpy(dir, splitInput);
+        } 
+        else {
+            //errorPrint();
+            argCount = 99; // make error happen
+        }
 
         while (splitInput) {
           if (argCount++ > 1) {
