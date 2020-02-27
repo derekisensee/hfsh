@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <fcntl.h>
 
 // should single external commands run in their own thread? 
  // don't wait if given & - for last cmd without a & after it, do execv and make hfsh wait. so last cmd is in "foreground"
@@ -17,7 +18,7 @@ void errorPrint() {
 }
 
 // first argument is command, second is the arguments for the command
-void *extcmd(char *cmd, char *ext, int waiting) {
+void *extcmd(char *cmd, char *ext, int waiting, char *file) {
   // first, have to put ext into an array of strings
   char **args = NULL;
   int spaces = 0;
@@ -59,6 +60,11 @@ void *extcmd(char *cmd, char *ext, int waiting) {
       int status;
       //pid_t w;
       if (fork() == 0) {
+        if (file != NULL) {
+          int fp = open(file, O_RDWR | O_CREAT | O_TRUNC); // change permissions here?
+          dup2(fp, 1);
+          close(fp);
+        }
         execv(spCopy, args);
       } 
       else if (waiting == 1) {
@@ -76,7 +82,7 @@ void *extcmd(char *cmd, char *ext, int waiting) {
   return 0;
 }
 
-void cmdChunk(char *splitInput) {
+void cmdChunk(char *splitInput, char *file) {
   //char *splitInput = strtok();
   if (strcmp(splitInput, "exit") == 0) {
     splitInput = strtok(NULL, " ");
@@ -144,7 +150,7 @@ void cmdChunk(char *splitInput) {
     splitInput = strtok(NULL, "");
     //printf("%s | %s", cmd, splitInput);
     // have to: check for &, >, respond appropriately
-    extcmd(cmd, splitInput, 1);
+    extcmd(cmd, splitInput, 1, file);
   }
 }
 
@@ -156,14 +162,16 @@ void handleInput(char *buffer) {
   char *inputCopy = malloc(strlen(buffer)+1);
   strcpy(inputCopy, buffer);
   char *redir = strtok(inputCopy, ">");
-  char *firstChunk = malloc(strlen(redir)+1);;
+  char *firstChunk = malloc(strlen(redir)+1);
   strcpy(firstChunk, redir);
+  char *file;
   // if we have a file to redirect to
-  if ((redir = strtok(NULL, " ")) != NULL) {
-    freopen(redir, "w", stdout);
+  if ((redir = strtok(NULL, " \n")) != NULL) {
+    file = malloc(strlen(redir)+1);
+    strcpy(file, redir);
   }
   char *splitInput = strtok(firstChunk, " \t\n"); 
-  cmdChunk(splitInput);
+  cmdChunk(splitInput, file);
   // ------------
   //char *splitInput = strtok(buffer, " \t\n"); 
   //cmdChunk(splitInput);
