@@ -9,7 +9,7 @@
 // should single external commands run in their own thread? 
  // don't wait if given & - for last cmd without a & after it, do execv and make hfsh wait. so last cmd is in "foreground"
 
-// need to make path a char[] ??
+// have to make paths absolute? include entire path to folders specified
 char path[9068]="/bin:";
 
 void errorPrint() {
@@ -61,7 +61,7 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
       //pid_t w;
       if (fork() == 0) {
         if (file != NULL) {
-          int fp = open(file, O_RDWR | O_CREAT | O_TRUNC); // change permissions here?
+          int fp = open(file, O_RDWR | O_CREAT | O_TRUNC, 0666); // change permissions here?
           dup2(fp, 1);
           close(fp);
         }
@@ -162,13 +162,23 @@ void handleInput(char *buffer) {
   char *inputCopy = malloc(strlen(buffer)+1);
   strcpy(inputCopy, buffer);
   char *redir = strtok(inputCopy, ">");
+  //int err = 0;
+
   char *firstChunk = malloc(strlen(redir)+1);
   strcpy(firstChunk, redir);
-  char *file;
+
+  char *file = NULL;
   // if we have a file to redirect to
-  if ((redir = strtok(NULL, " \n")) != NULL) {
-    file = malloc(strlen(redir)+1);
-    strcpy(file, redir);
+  if (strstr(buffer, ">")) {
+    redir = strtok(NULL, " \n");
+    if (redir != NULL) {
+      file = malloc(strlen(redir)+1);
+      strcpy(file, redir);
+    }
+    else {
+      errorPrint();
+      //err = 1;
+    }
   }
   char *splitInput = strtok(firstChunk, " \t\n"); 
   cmdChunk(splitInput, file);
