@@ -8,7 +8,7 @@
 
 // should single external commands run in their own thread? 
  // don't wait if given & - for last cmd without a & after it, do execv and make hfsh wait. so last cmd is in "foreground"
-
+// exit' ' (exit with space after it) is an error - intentional?
 // have to make paths absolute? include entire path to folders specified
 char path[9068]="/bin:";
 
@@ -141,7 +141,7 @@ void cmdChunk(char *splitInput, char *file) {
     }
     //printf("%s", path);
   }
-  else if (strcmp(splitInput, "\r") == 0) {
+  else if (splitInput == NULL) {
     // do nothing ??????????????
   }
   else {
@@ -157,11 +157,13 @@ void cmdChunk(char *splitInput, char *file) {
 void handleInput(char *buffer) {
   // need newline to be delimiter b/c if user just hits 'exit' and then an enter immediately after, 
   //strtok won't split up the result correctly
+  // check 
+
   // -----need to check if redirection or &'s------ 
   // redirection first
   char *inputCopy = malloc(strlen(buffer)+1);
   strcpy(inputCopy, buffer);
-  char *redir = strtok(inputCopy, ">");
+  char *redir = strtok(inputCopy, ">"); 
   int err = 0;
 
   char *firstChunk = malloc(strlen(redir)+1);
@@ -170,7 +172,7 @@ void handleInput(char *buffer) {
   char *file = NULL;
   // if we have a file to redirect to
   if (strstr(buffer, ">")) {
-    redir = strtok(NULL, " \n");
+    redir = strtok(NULL, " \n"); // if file is nothing
     if (redir != NULL) {
       file = malloc(strlen(redir)+1);
       strcpy(file, redir);
@@ -179,23 +181,20 @@ void handleInput(char *buffer) {
       errorPrint();
       err = 1;
     }
-  }
+  } // seg fault somewhere in here!?!?!?!
+  //printf("%s", firstChunk);
   if (err == 0) {
     if ((redir = strtok(NULL, " ")) == NULL) {
-      char *splitInput = strtok(firstChunk, " \t\n"); 
+      char *splitInput = strtok(firstChunk, " \t\n");
+      if (splitInput == NULL) {
+        printf("null");
+      }
       cmdChunk(splitInput, file);
     }
     else {
       errorPrint();
-    }
-    
-  }
-  
-  // ------------
-  //char *splitInput = strtok(buffer, " \t\n"); 
-  //cmdChunk(splitInput);
-  // built-in commands
-  
+    } 
+  }  
 }
 
 void interactiveMode() {
