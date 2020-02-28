@@ -162,7 +162,7 @@ void handleInput(char *buffer) {
   char *inputCopy = malloc(strlen(buffer)+1);
   strcpy(inputCopy, buffer);
   char *redir = strtok(inputCopy, ">");
-  //int err = 0;
+  int err = 0;
 
   char *firstChunk = malloc(strlen(redir)+1);
   strcpy(firstChunk, redir);
@@ -177,11 +177,20 @@ void handleInput(char *buffer) {
     }
     else {
       errorPrint();
-      //err = 1;
+      err = 1;
     }
   }
-  char *splitInput = strtok(firstChunk, " \t\n"); 
-  cmdChunk(splitInput, file);
+  if (err == 0) {
+    if ((redir = strtok(NULL, " ")) == NULL) {
+      char *splitInput = strtok(firstChunk, " \t\n"); 
+      cmdChunk(splitInput, file);
+    }
+    else {
+      errorPrint();
+    }
+    
+  }
+  
   // ------------
   //char *splitInput = strtok(buffer, " \t\n"); 
   //cmdChunk(splitInput);
