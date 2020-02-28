@@ -14,7 +14,7 @@ char path[9068]="/bin:";
 
 void errorPrint() {
   char error_message[30] = "An error has occurred\n";
-  write(STDERR_FILENO, error_message, strlen(error_message)); 
+  write(STDERR_FILENO, error_message, strlen(error_message));
 }
 
 // first argument is command, second is the arguments for the command
@@ -157,44 +157,51 @@ void cmdChunk(char *splitInput, char *file) {
 void handleInput(char *buffer) {
   // need newline to be delimiter b/c if user just hits 'exit' and then an enter immediately after, 
   //strtok won't split up the result correctly
-  // check 
+  // check whitespace case
+  char *whitespaceCheck = malloc(strlen(buffer)+1);
+  strcpy(whitespaceCheck, buffer);
+  char *whitespaceSplit = strtok(whitespaceCheck, " \t\n");
+  if (whitespaceSplit == NULL) { // if blank input is given
+    // do nothing
+  }
+  else {
+    // -----need to check if redirection or &'s------ 
+    // redirection first
+    char *inputCopy = malloc(strlen(buffer)+1);
+    strcpy(inputCopy, buffer);
+    char *redir = strtok(inputCopy, ">"); 
+    int err = 0;
 
-  // -----need to check if redirection or &'s------ 
-  // redirection first
-  char *inputCopy = malloc(strlen(buffer)+1);
-  strcpy(inputCopy, buffer);
-  char *redir = strtok(inputCopy, ">"); 
-  int err = 0;
+    char *firstChunk = malloc(strlen(redir)+1);
+    strcpy(firstChunk, redir);
 
-  char *firstChunk = malloc(strlen(redir)+1);
-  strcpy(firstChunk, redir);
-
-  char *file = NULL;
-  // if we have a file to redirect to
-  if (strstr(buffer, ">")) {
-    redir = strtok(NULL, " \n"); // if file is nothing
-    if (redir != NULL) {
-      file = malloc(strlen(redir)+1);
-      strcpy(file, redir);
-    }
-    else {
-      errorPrint();
-      err = 1;
-    }
-  } // seg fault somewhere in here!?!?!?!
-  //printf("%s", firstChunk);
-  if (err == 0) {
-    if ((redir = strtok(NULL, " ")) == NULL) {
-      char *splitInput = strtok(firstChunk, " \t\n");
-      if (splitInput == NULL) {
-        printf("null");
+    char *file = NULL;
+    // if we have a file to redirect to
+    if (strstr(buffer, ">")) {
+      redir = strtok(NULL, " \n"); // if file is nothing
+      if (redir != NULL) {
+        file = malloc(strlen(redir)+1);
+        strcpy(file, redir);
       }
-      cmdChunk(splitInput, file);
+      else {
+        errorPrint();
+        err = 1;
+      }
+    } // seg fault somewhere in here!?!?!?!
+    //printf("%s", firstChunk);
+    if (err == 0) {
+      if ((redir = strtok(NULL, " ")) == NULL) {
+        char *splitInput = strtok(firstChunk, " \t\n");
+        if (splitInput == NULL) {
+          printf("null");
+        }
+        cmdChunk(splitInput, file);
+      }
+      else {
+        errorPrint();
+      } 
     }
-    else {
-      errorPrint();
-    } 
-  }  
+  }
 }
 
 void interactiveMode() {
@@ -213,7 +220,7 @@ void interactiveMode() {
   }
 }
 
-void batchMode(FILE *fp) {
+void batchMode(FILE *fp) { // echo ! putting extra newline or something?
   char *buffer;
   size_t buffSize = 32;
   //size_t input;
@@ -221,7 +228,6 @@ void batchMode(FILE *fp) {
   
   while (getline(&buffer, &buffSize, fp) != -1) {
     handleInput(buffer);
-    //getline(&buffer, &buffSize, fp);
   }
 }
 
@@ -234,6 +240,17 @@ int main(int argc, char *args[]) {
   // batch mode
   if (argc == 2) {
     FILE *fp = fopen(args[1], "r");
-    batchMode(fp);
+    if (fp != NULL) {
+      batchMode(fp);
+      fclose(fp);
+    }
+    else {
+        errorPrint();
+        exit(1);
+    }
+  }
+  if (argc > 2) {
+    errorPrint();
+    exit(1);
   }
 }
