@@ -45,7 +45,8 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
   char *tempEnv;
   tempEnv = malloc(strlen(path)+1); 
   strcpy(tempEnv, path);
-  char *splitPaths = strtok(tempEnv, ":\n"); // strtok modifies 'buffer' ?
+  //char *splitPaths = strtok(tempEnv, ":\n"); // strtok modifies 'buffer' ?
+  char *splitPaths = strsep(&tempEnv, ":"); // strtok modifies 'buffer' ?
   char slash[1024] = {'/', '\0'};
   strcat(slash, cmd); // slash now holds "/cmd"
 
@@ -55,6 +56,8 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
     char spCopy[1024] = ""; // seems to reset spCopy between path checks
     strcat(spCopy, splitPaths);
     strcat(spCopy, slash);
+
+    //printf("! %s\n", spCopy);
     
     if (access(spCopy, F_OK) == 0) {
       found = 1;
@@ -75,11 +78,11 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
       break;
     }
     else {
-      splitPaths = strtok(NULL, " ");
+      splitPaths = strsep(&tempEnv, ":");
     }
   }
   if (found == 0) {
-    //printf("%s", path);
+    //printf("path error");
     errorPrint();
   }
   return 0;
@@ -90,6 +93,7 @@ void cmdChunk(char *splitInput, char *file, int waiting) {
   if (strcmp(splitInput, "exit") == 0) {
     splitInput = strtok(NULL, " ");
     if (splitInput != NULL) {
+      //printf("huh?");
       errorPrint();
     }
     else
@@ -127,7 +131,7 @@ void cmdChunk(char *splitInput, char *file, int waiting) {
       strcat(path, splitInput);
       strcat(path, ":");
     }
-    printf("%s", path);
+    //printf("%s", path);
   }
   else if (splitInput == NULL) {
     // do nothing ??????????????
@@ -181,11 +185,12 @@ void chunkHandle(char *currCmd, int waiting) {
       cmdChunk(splitInput, file, waiting);
     }
     else {
-      //printf("%s", redir);
+      //printf("redirredier");
       errorPrint();
     }
   }
   else {
+    //printf("this error");
     errorPrint();
   }
 }
