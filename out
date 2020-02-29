@@ -1,0 +1,12 @@
+Makefile
+README.md
+debugsh
+f
+hfsh
+hfsh.c
+hfsh.o
+out
+run-tests.sh
+test-hfsh.sh
+tests
+tests-out

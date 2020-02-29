@@ -61,7 +61,7 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
       int status;
       //pid_t w;
       if (fork() == 0) {
-        if (file != NULL) {
+        if (file != NULL) { // if we have a file, write to that instead
           int fp = open(file, O_RDWR | O_CREAT | O_TRUNC, 0666); // change permissions here?
           dup2(fp, 1);
           close(fp);
@@ -83,7 +83,7 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
   return 0;
 }
 
-void cmdChunk(char *splitInput, char *file) {
+void cmdChunk(char *splitInput, char *file, int waiting) {
   //char *splitInput = strtok();
   if (strcmp(splitInput, "exit") == 0) {
     splitInput = strtok(NULL, " ");
@@ -108,9 +108,6 @@ void cmdChunk(char *splitInput, char *file) {
         //argCount = 99; // make error happen
         // TODO: need to make error trip later
     }
-    //printf("%s", splitInput);
-    // checks if we have more than arg
-    //printf("%s", dir);
     splitInput = strtok(NULL, " ");
     if (splitInput == NULL) {
       if (chdir(dir) == -1) {
@@ -137,9 +134,52 @@ void cmdChunk(char *splitInput, char *file) {
     char *cmd = malloc(strlen(splitInput));
     strcpy(cmd, splitInput);
     splitInput = strtok(NULL, "");
-    //printf("%s | %s", cmd, splitInput);
-    // have to: check for &, >, respond appropriately
-    extcmd(cmd, splitInput, 1, file);
+
+    extcmd(cmd, splitInput, waiting, file);
+  }
+}
+
+void chunkHandle(char *currCmd, int waiting) {
+  // redirection first
+  char *chunkCopy = malloc(strlen(currCmd)+1);
+  strcpy(chunkCopy, currCmd);
+  char *redir = strtok(chunkCopy, ">"); 
+  int err = 0;
+
+  char *firstChunk = malloc(strlen(redir)+1);
+  strcpy(firstChunk, redir);
+
+  char *file = NULL;
+
+  // if we have a file to redirect to
+  if (strstr(currCmd, ">")) {
+    redir = strtok(NULL, " \n");
+    if (redir != NULL) {
+      //printf("not null");
+      file = malloc(strlen(redir)+1);
+      strcpy(file, redir);
+    }
+    else {
+      //errorPrint();
+      err = 1;
+    }
+  }
+
+  if (err == 0) {
+    if ((redir = strtok(NULL, " ")) == NULL) { // make sure we only get 1 file
+      char *splitInput = strtok(firstChunk, " \t\n");
+      if (splitInput == NULL) {
+        //printf("null");
+      }
+      cmdChunk(splitInput, file, waiting);
+    }
+    else {
+      //printf("%s", redir);
+      errorPrint();
+    }
+  }
+  else {
+    errorPrint();
   }
 }
 
@@ -148,55 +188,40 @@ void handleInput(char *buffer) {
   //strtok won't split up the result correctly
   int len = strlen(buffer);
   buffer[len-1] = '\0';
-
   // check whitespace case
-  char *whitespaceCheck = malloc(strlen(buffer)+1);
+  char *whitespaceCheck = malloc(len+1);
   strcpy(whitespaceCheck, buffer);
-  char *whitespaceSplit = strtok(whitespaceCheck, " \t\n");
-  if (whitespaceSplit == NULL) { // if blank input is given
+  char *whitespaceSplit = strtok(whitespaceCheck, " & > \t\n");
+  if (whitespaceSplit == NULL) { // if blank input is given or if only '&' or '>' is given
     // do nothing
   }
   else {
     // -----need to check if redirection or &'s------ 
-    // check for &, for every & split up, do the next chunk of tasks (including checking for '>')
-    
-    // redirection first
-    char *inputCopy = malloc(strlen(buffer)+1);
-    strcpy(inputCopy, buffer);
-    char *redir = strtok(inputCopy, ">"); 
-    int err = 0;
+    // check for &, for every & split up, do the next chunk of tasks 
+    char *inputCopyCurr = malloc(len + 1); // the current command
+    strcpy(inputCopyCurr, buffer);
+    char *inputCopyNext = malloc(len + 1); // what the next command would be
+    strcpy(inputCopyNext, buffer);
 
-    char *firstChunk = malloc(strlen(redir)+1);
-    strcpy(firstChunk, redir);
+    char *currCmd = strtok(inputCopyCurr, "&");
+    char *amp = strtok(inputCopyNext, "&"); // tokenized by '&'
+    amp = strtok(NULL, " "); // amp is our next command
 
-    char *file = NULL;
-    // if we have a file to redirect to
-    if (strstr(buffer, ">")) {
-      redir = strtok(NULL, " \n"); // if file is nothing
-      if (redir != NULL) {
-        file = malloc(strlen(redir)+1);
-        strcpy(file, redir);
+    // commands ran from this loop do NOT wait for parent to return
+    while (amp != NULL) {
+      chunkHandle(currCmd, 0);
+      currCmd = strtok(NULL, " ");
+      if (currCmd == NULL) {
+        break;
       }
-      else {
-        errorPrint();
-        err = 1;
-      }
-    } 
-    
-    if (err == 0) {
-      // now check and handle &
-
-      // ----------------------
-      if ((redir = strtok(NULL, " ")) == NULL) {
-        char *splitInput = strtok(firstChunk, " \t\n");
-        if (splitInput == NULL) {
-          printf("null");
-        }
-        cmdChunk(splitInput, file);
-      }
-      else {
-        errorPrint();
-      } 
+      amp = strtok(NULL, " ");
+    }
+    // then this last command will wait
+    if (amp == NULL) {
+      chunkHandle(currCmd, 1);
+    }
+    else {
+      chunkHandle(amp, 1);
     }
   }
 }
@@ -217,7 +242,7 @@ void interactiveMode() {
   }
 }
 
-void batchMode(FILE *fp) { // echo ! putting extra newline or something?
+void batchMode(FILE *fp) {
   char *buffer;
   size_t buffSize = 32;
   //size_t input;
