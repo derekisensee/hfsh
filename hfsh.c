@@ -78,6 +78,7 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
     }
   }
   if (found == 0) {
+    //printf("%s", path);
     errorPrint();
   }
   return 0;
@@ -134,8 +135,12 @@ void cmdChunk(char *splitInput, char *file, int waiting) {
     char *cmd = malloc(strlen(splitInput));
     strcpy(cmd, splitInput);
     splitInput = strtok(NULL, "");
-
     extcmd(cmd, splitInput, waiting, file);
+    /*if (splitInput != NULL) {
+    }
+    else { // if splitinput is blank, happens in 17.in example?
+      extcmd(cmd, cmd, waiting, file);
+    }*/
   }
 }
 
@@ -200,9 +205,33 @@ void handleInput(char *buffer) {
     // check for &, for every & split up, do the next chunk of tasks 
     char *inputCopyCurr = malloc(len + 1); // the current command
     strcpy(inputCopyCurr, buffer);
-    char *inputCopyNext = malloc(len + 1); // what the next command would be
-    strcpy(inputCopyNext, buffer);
+    //char *inputCopyNext = malloc(len + 1); // what the next command would be
+    //strcpy(inputCopyNext, buffer);
 
+    // ------ experiment begin
+    if (strstr(buffer, "&")) {
+      int count = 0;
+      int i;
+      for (i = 0; i < len; i++) {
+        if (buffer[i] == '&') {
+          ++count;
+        }
+      }
+      char *currCmd = strtok(inputCopyCurr, " &");
+      while (count-- > 0 && currCmd != NULL) {
+        chunkHandle(currCmd, 0);
+        currCmd = strtok(NULL, " ");
+      }
+      if (currCmd != NULL) {
+        chunkHandle(currCmd, 1);
+      }
+    }
+    else { // single, 'regular' commands
+      chunkHandle(buffer, 1);
+    }
+    
+    ///
+    /*
     char *currCmd = strtok(inputCopyCurr, "&");
     char *amp = strtok(inputCopyNext, "&"); // tokenized by '&'
     amp = strtok(NULL, " "); // amp is our next command
@@ -222,7 +251,7 @@ void handleInput(char *buffer) {
     }
     else {
       chunkHandle(amp, 1);
-    }
+    }*/
   }
 }
 
