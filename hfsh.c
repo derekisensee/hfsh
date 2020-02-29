@@ -6,10 +6,6 @@
 #include <errno.h>
 #include <fcntl.h>
 
-// should single external commands run in their own thread? 
- // don't wait if given & - for last cmd without a & after it, do execv and make hfsh wait. so last cmd is in "foreground"
-// exit' ' (exit with space after it) is an error - intentional?
-// have to make paths absolute? include entire path to folders specified
 char path[9068]="/bin:";
 
 void errorPrint() {
@@ -29,7 +25,7 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
     args = realloc(args, sizeof (char*) * ++spaces);
     args[spaces - 1] = ext;
     // and move on to the next token
-    ext = strtok(NULL, " "); // ??? need to delimit by newline/carriage return
+    ext = strtok(NULL, " ");
   }
   args = realloc(args, sizeof (char*) * ++spaces);
   args[spaces - 1] = NULL;
@@ -56,40 +52,47 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
     char spCopy[1024] = ""; // seems to reset spCopy between path checks
     strcat(spCopy, splitPaths);
     strcat(spCopy, slash);
-
-    //printf("! %s\n", spCopy);
+    
     
     if (access(spCopy, F_OK) == 0) {
-      found = 1;
-      int status;
-      pid_t wpid;
-      if (fork() == 0) {
-        if (file != NULL) { // if we have a file, write to that instead
-          int fp = open(file, O_RDWR | O_CREAT | O_TRUNC, 0666); // change permissions here?
-          dup2(fp, 1);
-          close(fp);
+      if (waiting == 1) { // this waiting check was the final piece i needed...
+        found = 1;
+        int status;
+        pid_t wpid = fork();
+        if (wpid == 0) {
+          if (file != NULL) { // if we have a file, write to that instead
+            int fp = open(file, O_RDWR | O_CREAT | O_TRUNC, 0666); 
+            dup2(fp, 1);
+            close(fp);
+          }
+          execv(spCopy, args);
+        } 
+        else { 
+          wait(&status);
         }
-        execv(spCopy, args);
-      } 
-      else if (waiting == 1) { // parent waits if waiting enabled
-        wait(&status);
+        while ((wpid = wait(&status)) > 0); // parent waits for all children to finish
+        break;
       }
-      while ((wpid = wait(&status)) > 0); // parent waits for all children to finish
-      break;
+      else { // run without waiting
+        if (file != NULL) { // if we have a file, write to that instead
+            int fp = open(file, O_RDWR | O_CREAT | O_TRUNC, 0666);
+            dup2(fp, 1);
+            close(fp);
+          }
+          execv(spCopy, args);
+      }
     }
     else {
       splitPaths = strsep(&tempEnv, ":");
     }
   }
   if (found == 0) {
-    //printf("path error");
     errorPrint();
   }
   return 0;
 }
 
 void cmdChunk(char *splitInput, char *file, int waiting) {
-  //char *splitInput = strtok();
   if (strcmp(splitInput, "exit") == 0) {
     splitInput = strtok(NULL, " ");
     if (splitInput != NULL) {
@@ -107,12 +110,6 @@ void cmdChunk(char *splitInput, char *file, int waiting) {
     //printf("%s", splitInput);
     if (splitInput != NULL) {
       strcpy(dir, splitInput);
-    } 
-    else {
-        //errorPrint();
-        //printf("null!");
-        //argCount = 99; // make error happen
-        // TODO: need to make error trip later
     }
     splitInput = strtok(NULL, " ");
     if (splitInput == NULL) {
@@ -141,11 +138,6 @@ void cmdChunk(char *splitInput, char *file, int waiting) {
     strcpy(cmd, splitInput);
     splitInput = strtok(NULL, "");
     extcmd(cmd, splitInput, waiting, file);
-    /*if (splitInput != NULL) {
-    }
-    else { // if splitinput is blank, happens in 17.in example?
-      extcmd(cmd, cmd, waiting, file);
-    }*/
   }
 }
 
@@ -165,12 +157,10 @@ void chunkHandle(char *currCmd, int waiting) {
   if (strstr(currCmd, ">")) {
     redir = strtok(NULL, " \n");
     if (redir != NULL) {
-      //printf("not null");
       file = malloc(strlen(redir)+1);
       strcpy(file, redir);
     }
     else {
-      //errorPrint();
       err = 1;
     }
   }
@@ -179,18 +169,14 @@ void chunkHandle(char *currCmd, int waiting) {
     if ((redir = strtok(NULL, " ")) == NULL) { // make sure we only get 1 file
       char *splitInput = strtok(firstChunk, " \t\n");
       if (splitInput == NULL) {
-        //return;
-        //cmdChunk(splitInput, file, waiting);
       }
       cmdChunk(splitInput, file, waiting);
     }
     else {
-      //printf("redirredier");
       errorPrint();
     }
   }
   else {
-    //printf("this error");
     errorPrint();
   }
 }
@@ -207,24 +193,24 @@ void handleInput(char *buffer) {
   strcpy(whitespaceCheck, buffCheck);
   char *whitespaceSplit = strtok(whitespaceCheck, " & > \t\n");
   if (whitespaceSplit == NULL) { // if blank input is given or if only '&' or '>' is given
-    // do nothing
   }
   else {
-    // -----need to check if redirection or &'s------ 
-
-    // ------ experiment begin
+    // ---- splits up '&'s ------
     if (strstr(buffer, "&")) {
       char *currCmd = strsep(&buffCheck, "&");
-      //char empty[5] = {'\0'};
+      pid_t p;
+      int status;
       while (currCmd != NULL) {
-        chunkHandle(currCmd, 0);
-        currCmd = strsep(&buffCheck, "&");
-        if (currCmd != NULL && strcmp(currCmd, "") == 0) {
+        if ((p = fork()) == 0) {
+          chunkHandle(currCmd, 0);
+        }
+        else {
           currCmd = strsep(&buffCheck, "&");
         }
       }
+      while ((p = wait(&status)) > 0); // parent waits for all children to finish
       if (currCmd != NULL) {
-        chunkHandle(currCmd, 1);
+        chunkHandle(currCmd, 0);
       }
     }
     else { // single, 'regular' commands
@@ -261,7 +247,6 @@ void batchMode(FILE *fp) {
 }
 
 int main(int argc, char *args[]) {
-  //path = "/bin:"; // our initial path
   // normal mode
   if (argc == 1) {
     interactiveMode();
