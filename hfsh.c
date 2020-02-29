@@ -25,12 +25,22 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
   ext = strtok(ext, " \n");
   args = realloc(args, sizeof (char*) * ++spaces);
   args[0] = cmd;
-  while (ext) {
+  while (ext != NULL) {
     args = realloc(args, sizeof (char*) * ++spaces);
     args[spaces - 1] = ext;
     // and move on to the next token
     ext = strtok(NULL, " "); // ??? need to delimit by newline/carriage return
   }
+  args = realloc(args, sizeof (char*) * ++spaces);
+  args[spaces - 1] = NULL;
+  // uncommet to print args 
+  /*
+  int i = 0;
+  while (args[i] != NULL) {
+    printf("%s\n", args[i++]);
+  }
+  printf("%s", args[i]);  
+  */
   // since strtok overwrites old string, have to make copy
   char *tempEnv;
   tempEnv = malloc(strlen(path)+1); 
@@ -114,18 +124,6 @@ void cmdChunk(char *splitInput, char *file) {
     if (splitInput == NULL) {
       if (chdir(dir) == -1) {
         errorPrint();
-
-        /*switch (errno)
-        {
-        case ENOENT:
-          printf( "Unable to locate the directory: %s\n", dir );
-          break;
-        case EINVAL:
-          printf( "Invalid buffer.\n");
-          break;
-        default:
-          printf( "Unknown error.\n");
-        }*/
       }
     } 
     else {
@@ -157,6 +155,9 @@ void cmdChunk(char *splitInput, char *file) {
 void handleInput(char *buffer) {
   // need newline to be delimiter b/c if user just hits 'exit' and then an enter immediately after, 
   //strtok won't split up the result correctly
+  int len = strlen(buffer);
+  buffer[len-1] = '\0';
+
   // check whitespace case
   char *whitespaceCheck = malloc(strlen(buffer)+1);
   strcpy(whitespaceCheck, buffer);
