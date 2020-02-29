@@ -33,7 +33,7 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
   }
   args = realloc(args, sizeof (char*) * ++spaces);
   args[spaces - 1] = NULL;
-  // uncommet to print args 
+  // uncomment to print args 
   /*
   int i = 0;
   while (args[i] != NULL) {
@@ -47,26 +47,17 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
   strcpy(tempEnv, path);
   char *splitPaths = strtok(tempEnv, ":\n"); // strtok modifies 'buffer' ?
   char slash[1024] = {'/', '\0'};
-  //splitPaths = strtok(NULL, " ");
   strcat(slash, cmd); // slash now holds "/cmd"
-  //char spCopy[] = ""; 
-  //printf("copy: %s\n", slash);
 
-  //printf("%s %s %s", args[0], args[1], args[2]);
   int found = 0;
   while (splitPaths != NULL) {
     // use access() to find program
-    //char *currPath = malloc(strlen(strcat(splitPaths, slash)));
     char spCopy[1024] = ""; // seems to reset spCopy between path checks
     strcat(spCopy, splitPaths);
-    //printf("1212: %s\n", slash);
     strcat(spCopy, slash);
-    //char *currPath = strcat(spCopy, slash); // doesn't like this, splitPaths not working?
     
-    //printf("copy: %s\n", spCopy);
     if (access(spCopy, F_OK) == 0) {
       found = 1;
-      //printf("%s", spCopy);
       int status;
       //pid_t w;
       if (fork() == 0) {
@@ -167,6 +158,8 @@ void handleInput(char *buffer) {
   }
   else {
     // -----need to check if redirection or &'s------ 
+    // check for &, for every & split up, do the next chunk of tasks (including checking for '>')
+    
     // redirection first
     char *inputCopy = malloc(strlen(buffer)+1);
     strcpy(inputCopy, buffer);
@@ -188,9 +181,12 @@ void handleInput(char *buffer) {
         errorPrint();
         err = 1;
       }
-    } // seg fault somewhere in here!?!?!?!
-    //printf("%s", firstChunk);
+    } 
+    
     if (err == 0) {
+      // now check and handle &
+
+      // ----------------------
       if ((redir = strtok(NULL, " ")) == NULL) {
         char *splitInput = strtok(firstChunk, " \t\n");
         if (splitInput == NULL) {
