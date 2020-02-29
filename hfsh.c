@@ -59,7 +59,7 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
     if (access(spCopy, F_OK) == 0) {
       found = 1;
       int status;
-      //pid_t w;
+      pid_t wpid;
       if (fork() == 0) {
         if (file != NULL) { // if we have a file, write to that instead
           int fp = open(file, O_RDWR | O_CREAT | O_TRUNC, 0666); // change permissions here?
@@ -68,9 +68,10 @@ void *extcmd(char *cmd, char *ext, int waiting, char *file) {
         }
         execv(spCopy, args);
       } 
-      else if (waiting == 1) {
+      else if (waiting == 1) { // parent waits if waiting enabled
         wait(&status);
       }
+      while ((wpid = wait(&status)) > 0); // parent waits for all children to finish
       break;
     }
     else {
@@ -126,7 +127,7 @@ void cmdChunk(char *splitInput, char *file, int waiting) {
       strcat(path, splitInput);
       strcat(path, ":");
     }
-    //printf("%s", path);
+    printf("%s", path);
   }
   else if (splitInput == NULL) {
     // do nothing ??????????????
@@ -174,7 +175,8 @@ void chunkHandle(char *currCmd, int waiting) {
     if ((redir = strtok(NULL, " ")) == NULL) { // make sure we only get 1 file
       char *splitInput = strtok(firstChunk, " \t\n");
       if (splitInput == NULL) {
-        //printf("null");
+        //return;
+        //cmdChunk(splitInput, file, waiting);
       }
       cmdChunk(splitInput, file, waiting);
     }
@@ -191,67 +193,38 @@ void chunkHandle(char *currCmd, int waiting) {
 void handleInput(char *buffer) {
   // need newline to be delimiter b/c if user just hits 'exit' and then an enter immediately after, 
   //strtok won't split up the result correctly
+  char *buffCheck = malloc(strlen(buffer) + 1);
+  strcpy(buffCheck, buffer);
   int len = strlen(buffer);
-  buffer[len-1] = '\0';
+  buffCheck[len-1] = '\0';
   // check whitespace case
   char *whitespaceCheck = malloc(len+1);
-  strcpy(whitespaceCheck, buffer);
+  strcpy(whitespaceCheck, buffCheck);
   char *whitespaceSplit = strtok(whitespaceCheck, " & > \t\n");
   if (whitespaceSplit == NULL) { // if blank input is given or if only '&' or '>' is given
     // do nothing
   }
   else {
     // -----need to check if redirection or &'s------ 
-    // check for &, for every & split up, do the next chunk of tasks 
-    char *inputCopyCurr = malloc(len + 1); // the current command
-    strcpy(inputCopyCurr, buffer);
-    //char *inputCopyNext = malloc(len + 1); // what the next command would be
-    //strcpy(inputCopyNext, buffer);
 
     // ------ experiment begin
     if (strstr(buffer, "&")) {
-      int count = 0;
-      int i;
-      for (i = 0; i < len; i++) {
-        if (buffer[i] == '&') {
-          ++count;
-        }
-      }
-      char *currCmd = strtok(inputCopyCurr, " &");
-      while (count-- > 0 && currCmd != NULL) {
+      char *currCmd = strsep(&buffCheck, "&");
+      //char empty[5] = {'\0'};
+      while (currCmd != NULL) {
         chunkHandle(currCmd, 0);
-        currCmd = strtok(NULL, " ");
+        currCmd = strsep(&buffCheck, "&");
+        if (currCmd != NULL && strcmp(currCmd, "") == 0) {
+          currCmd = strsep(&buffCheck, "&");
+        }
       }
       if (currCmd != NULL) {
         chunkHandle(currCmd, 1);
       }
     }
     else { // single, 'regular' commands
-      chunkHandle(buffer, 1);
+      chunkHandle(buffCheck, 1);
     }
-    
-    ///
-    /*
-    char *currCmd = strtok(inputCopyCurr, "&");
-    char *amp = strtok(inputCopyNext, "&"); // tokenized by '&'
-    amp = strtok(NULL, " "); // amp is our next command
-
-    // commands ran from this loop do NOT wait for parent to return
-    while (amp != NULL) {
-      chunkHandle(currCmd, 0);
-      currCmd = strtok(NULL, " ");
-      if (currCmd == NULL) {
-        break;
-      }
-      amp = strtok(NULL, " ");
-    }
-    // then this last command will wait
-    if (amp == NULL) {
-      chunkHandle(currCmd, 1);
-    }
-    else {
-      chunkHandle(amp, 1);
-    }*/
   }
 }
 
